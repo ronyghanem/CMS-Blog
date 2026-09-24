@@ -7,33 +7,19 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require 'connection.php';
+require_once 'classes/init.php';
 
-/*
-|--------------------------------------------------------------------------
-| Dashboard statistics
-|--------------------------------------------------------------------------
-*/
+$pdo = Database::getInstance();
 
-$userStmt = $pdo->query(
-    "SELECT COUNT(*) FROM users"
-);
+$user = new User($pdo);
+$category = new Category($pdo);
+$post = new Post($pdo);
 
-$totalUsers = $userStmt->fetchColumn();
+$totalUsers = $user->count();
 
+$totalCategories = $category->count();
 
-$categoryStmt = $pdo->query(
-    "SELECT COUNT(*) FROM categories"
-);
-
-$totalCategories = $categoryStmt->fetchColumn();
-
-
-$postStmt = $pdo->query(
-    "SELECT COUNT(*) FROM posts"
-);
-
-$totalPosts = $postStmt->fetchColumn();
+$totalPosts = $post->count();
 
 ?>
 

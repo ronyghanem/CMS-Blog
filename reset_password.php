@@ -2,7 +2,11 @@
 
 session_start();
 
-require 'connection.php';
+require_once 'classes/init.php';
+
+$pdo = Database::getInstance();
+
+$userManager = new User($pdo);
 
 $message = '';
 
@@ -35,21 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $hashedPassword = password_hash(
-                $password,
-                PASSWORD_DEFAULT
+            $userManager->updatePassword(
+                $userId,
+                $password
             );
-
-            $sql = "UPDATE users
-                    SET password = :password
-                    WHERE id = :id";
-
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-                ':password' => $hashedPassword,
-                ':id' => $userId
-            ]);
 
             unset($_SESSION['reset_user_id']);
 

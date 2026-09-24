@@ -2,7 +2,11 @@
 
 session_start();
 
-require 'connection.php';
+require_once 'classes/init.php';
+
+$pdo = Database::getInstance();
+
+$userManager = new User($pdo);
 
 $message = '';
 
@@ -23,19 +27,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $sql = "SELECT id, name, email, password
-                    FROM users
-                    WHERE email = :email";
+            $user = $userManager->login($email, $password);
 
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-                ':email' => $email
-            ]);
-
-            $user = $stmt->fetch();
-
-            if ($user && password_verify($password, $user['password'])) {
+            if ($user) {
 
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_name'] = $user['name'];

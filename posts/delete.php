@@ -7,7 +7,11 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require '../connection.php';
+require_once '../classes/init.php';
+
+$pdo = Database::getInstance();
+
+$post = new Post($pdo);
 
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     header('Location: index.php');
@@ -18,14 +22,7 @@ $id = (int) $_GET['id'];
 
 try {
 
-    $sql = "DELETE FROM posts
-            WHERE id = :id";
-
-    $stmt = $pdo->prepare($sql);
-
-    $stmt->execute([
-        ':id' => $id
-    ]);
+    $post->delete($id);
 
     header('Location: index.php');
     exit;

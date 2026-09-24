@@ -7,7 +7,11 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require '../connection.php';
+require_once '../classes/init.php';
+
+$pdo = Database::getInstance();
+
+$category = new Category($pdo);
 
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     header('Location: index.php');
@@ -18,13 +22,7 @@ $id = (int) $_GET['id'];
 
 try {
 
-    $sql = "DELETE FROM categories WHERE id = :id";
-
-    $stmt = $pdo->prepare($sql);
-
-    $stmt->execute([
-        ':id' => $id
-    ]);
+    $category->delete($id);
 
     header('Location: index.php');
     exit;

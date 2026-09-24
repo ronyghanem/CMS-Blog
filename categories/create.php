@@ -7,7 +7,11 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require '../connection.php';
+require_once '../classes/init.php';
+
+$pdo = Database::getInstance();
+
+$category = new Category($pdo);
 
 $message = '';
 
@@ -23,14 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $sql = "INSERT INTO categories (category_name)
-                    VALUES (:category_name)";
-
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-                ':category_name' => $categoryName
-            ]);
+            $category->create($categoryName);
 
             header('Location: index.php');
             exit;

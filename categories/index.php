@@ -7,15 +7,13 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require '../connection.php';
+require_once '../classes/init.php';
 
-$sql = "SELECT * 
-        FROM categories 
-        ORDER BY id DESC";
+$pdo = Database::getInstance();
 
-$stmt = $pdo->query($sql);
+$category = new Category($pdo);
 
-$categories = $stmt->fetchAll();
+$categories = $category->getAll();
 
 ?>
 
@@ -219,22 +217,22 @@ $categories = $stmt->fetchAll();
 
                                 <tbody>
 
-                                    <?php foreach ($categories as $category): ?>
+                                    <?php foreach ($categories as $categoryItem): ?>
 
                                         <tr>
 
                                             <td>
-                                                <?= $category['id'] ?>
+                                                <?= $categoryItem['id'] ?>
                                             </td>
 
                                             <td class="fw-semibold">
-                                                <?= htmlspecialchars($category['category_name']) ?>
+                                                <?= htmlspecialchars($categoryItem['category_name']) ?>
                                             </td>
 
                                             <td class="text-end">
 
                                                 <a
-                                                    href="edit.php?id=<?= $category['id'] ?>"
+                                                    href="edit.php?id=<?= $categoryItem['id'] ?>"
                                                     class="btn btn-sm btn-outline-primary"
                                                 >
                                                     <i class="bi bi-pencil"></i>
@@ -243,7 +241,7 @@ $categories = $stmt->fetchAll();
 
 
                                                 <a
-                                                    href="delete.php?id=<?= $category['id'] ?>"
+                                                    href="delete.php?id=<?= $categoryItem['id'] ?>"
                                                     class="btn btn-sm btn-outline-danger"
                                                     onclick="return confirm('Are you sure you want to delete this category?');"
                                                 >

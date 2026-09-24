@@ -7,10 +7,22 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require '../connection.php';
+require_once '../classes/init.php';
+
+$pdo = Database::getInstance();
+
+$category = new Category($pdo);
+$user = new User($pdo);
+$postManager = new Post($pdo);
 
 $message = '';
 
+
+/*
+|--------------------------------------------------------------------------
+| Validate ID
+|--------------------------------------------------------------------------
+*/
 
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     header('Location: index.php');
@@ -26,13 +38,7 @@ $id = (int) $_GET['id'];
 |--------------------------------------------------------------------------
 */
 
-$categoryStmt = $pdo->query(
-    "SELECT id, category_name
-     FROM categories
-     ORDER BY category_name ASC"
-);
-
-$categories = $categoryStmt->fetchAll();
+$categories = $category->getAll();
 
 
 /*
@@ -41,13 +47,21 @@ $categories = $categoryStmt->fetchAll();
 |--------------------------------------------------------------------------
 */
 
-$userStmt = $pdo->query(
-    "SELECT id, name
-     FROM users
-     ORDER BY name ASC"
-);
+$users = $user->getAll();
 
-$users = $userStmt->fetchAll();
+
+/*
+|--------------------------------------------------------------------------
+| Get existing post
+|--------------------------------------------------------------------------
+*/
+
+$post = $postManager->getById($id);
+
+if (!$post) {
+    header('Location: index.php');
+    exit;
+}
 
 
 /*
@@ -93,26 +107,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $sql = "UPDATE posts
-                    SET title = :title,
-                        category_id = :category_id,
-                        user_id = :user_id,
-                        content = :content,
-                        date = :date,
-                        reading_time = :reading_time
-                    WHERE id = :id";
-
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-                ':title' => $title,
-                ':category_id' => $categoryId,
-                ':user_id' => $userId,
-                ':content' => $content,
-                ':date' => $date,
-                ':reading_time' => $readingTime,
-                ':id' => $id
-            ]);
+            $postManager->update(
+                $id,
+                $title,
+                $categoryId,
+                $userId,
+                $content,
+                $date,
+                $readingTime
+            );
 
             header('Location: index.php');
             exit;
@@ -122,31 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Could not update post. Please try again.';
         }
     }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Get existing post
-|--------------------------------------------------------------------------
-*/
-
-$sql = "SELECT *
-        FROM posts
-        WHERE id = :id";
-
-$stmt = $pdo->prepare($sql);
-
-$stmt->execute([
-    ':id' => $id
-]);
-
-$post = $stmt->fetch();
-
-
-if (!$post) {
-    header('Location: index.php');
-    exit;
 }
 
 ?>
@@ -288,13 +266,13 @@ if (!$post) {
                                         Select a category
                                     </option>
 
-                                    <?php foreach ($categories as $category): ?>
+                                    <?php foreach ($categories as $categoryItem): ?>
 
                                         <option
-                                            value="<?= $category['id'] ?>"
-                                            <?= $category['id'] == $post['category_id'] ? 'selected' : '' ?>
+                                            value="<?= $categoryItem['id'] ?>"
+                                            <?= $categoryItem['id'] == $post['category_id'] ? 'selected' : '' ?>
                                         >
-                                            <?= htmlspecialchars($category['category_name']) ?>
+                                            <?= htmlspecialchars($categoryItem['category_name']) ?>
                                         </option>
 
                                     <?php endforeach; ?>
@@ -326,13 +304,13 @@ if (!$post) {
                                         Select an author
                                     </option>
 
-                                    <?php foreach ($users as $user): ?>
+                                    <?php foreach ($users as $userItem): ?>
 
                                         <option
-                                            value="<?= $user['id'] ?>"
-                                            <?= $user['id'] == $post['user_id'] ? 'selected' : '' ?>
+                                            value="<?= $userItem['id'] ?>"
+                                            <?= $userItem['id'] == $post['user_id'] ? 'selected' : '' ?>
                                         >
-                                            <?= htmlspecialchars($user['name']) ?>
+                                            <?= htmlspecialchars($userItem['name']) ?>
                                         </option>
 
                                     <?php endforeach; ?>

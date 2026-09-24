@@ -1,6 +1,12 @@
 <?php
 
-require 'connection.php';
+session_start();
+
+require_once 'classes/init.php';
+
+$pdo = Database::getInstance();
+
+$userManager = new User($pdo);
 
 $message = '';
 
@@ -26,37 +32,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $sql = "SELECT id
-                    FROM users
-                    WHERE email = :email";
-
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-                ':email' => $email
-            ]);
-
-            if ($stmt->fetch()) {
+            if ($userManager->emailExists($email)) {
 
                 $message = 'This email is already registered.';
 
             } else {
 
-                $hashedPassword = password_hash(
-                    $password,
-                    PASSWORD_DEFAULT
+                $userManager->create(
+                    $name,
+                    $email,
+                    $password
                 );
-
-                $sql = "INSERT INTO users (name, email, password)
-                        VALUES (:name, :email, :password)";
-
-                $stmt = $pdo->prepare($sql);
-
-                $stmt->execute([
-                    ':name' => $name,
-                    ':email' => $email,
-                    ':password' => $hashedPassword
-                ]);
 
                 $message = 'Registration successful!';
             }

@@ -7,26 +7,13 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require '../connection.php';
+require_once '../classes/init.php';
 
-$sql = "SELECT
-            posts.id,
-            posts.title,
-            posts.content,
-            posts.date,
-            posts.reading_time,
-            categories.category_name,
-            users.name AS author_name
-        FROM posts
-        INNER JOIN categories
-            ON posts.category_id = categories.id
-        INNER JOIN users
-            ON posts.user_id = users.id
-        ORDER BY posts.id DESC";
+$pdo = Database::getInstance();
 
-$stmt = $pdo->query($sql);
+$postManager = new Post($pdo);
 
-$posts = $stmt->fetchAll();
+$posts = $postManager->getAll();
 
 ?>
 
@@ -249,6 +236,7 @@ $posts = $stmt->fetchAll();
                                                 <small class="text-muted">
 
                                                     <?php
+
                                                     $preview = mb_substr(
                                                         $post['content'],
                                                         0,
@@ -260,6 +248,7 @@ $posts = $stmt->fetchAll();
                                                     if (mb_strlen($post['content']) > 60) {
                                                         echo '...';
                                                     }
+
                                                     ?>
 
                                                 </small>

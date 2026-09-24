@@ -7,7 +7,11 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require '../connection.php';
+require_once '../classes/init.php';
+
+$pdo = Database::getInstance();
+
+$category = new Category($pdo);
 
 $message = '';
 
@@ -31,16 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $sql = "UPDATE categories
-                    SET category_name = :category_name
-                    WHERE id = :id";
-
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-                ':category_name' => $categoryName,
-                ':id' => $id
-            ]);
+            $category->update($id, $categoryName);
 
             header('Location: index.php');
             exit;
@@ -53,20 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 
-$sql = "SELECT *
-        FROM categories
-        WHERE id = :id";
-
-$stmt = $pdo->prepare($sql);
-
-$stmt->execute([
-    ':id' => $id
-]);
-
-$category = $stmt->fetch();
+$categoryData = $category->getById($id);
 
 
-if (!$category) {
+if (!$categoryData) {
     header('Location: index.php');
     exit;
 }
@@ -176,7 +161,7 @@ if (!$category) {
                                 id="category_name"
                                 name="category_name"
                                 class="form-control"
-                                value="<?= htmlspecialchars($category['category_name']) ?>"
+                                value="<?= htmlspecialchars($categoryData['category_name']) ?>"
                                 required
                             >
 

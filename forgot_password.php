@@ -2,7 +2,11 @@
 
 session_start();
 
-require 'connection.php';
+require_once 'classes/init.php';
+
+$pdo = Database::getInstance();
+
+$userManager = new User($pdo);
 
 $message = '';
 
@@ -22,17 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $sql = "SELECT id
-                    FROM users
-                    WHERE email = :email";
-
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-                ':email' => $email
-            ]);
-
-            $user = $stmt->fetch();
+            $user = $userManager->findByEmail($email);
 
             if ($user) {
 

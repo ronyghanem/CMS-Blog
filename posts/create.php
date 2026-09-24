@@ -7,7 +7,13 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require '../connection.php';
+require_once '../classes/init.php';
+
+$pdo = Database::getInstance();
+
+$category = new Category($pdo);
+$user = new User($pdo);
+$post = new Post($pdo);
 
 $message = '';
 
@@ -18,13 +24,7 @@ $message = '';
 |--------------------------------------------------------------------------
 */
 
-$categoryStmt = $pdo->query(
-    "SELECT id, category_name
-     FROM categories
-     ORDER BY category_name ASC"
-);
-
-$categories = $categoryStmt->fetchAll();
+$categories = $category->getAll();
 
 
 /*
@@ -33,13 +33,7 @@ $categories = $categoryStmt->fetchAll();
 |--------------------------------------------------------------------------
 */
 
-$userStmt = $pdo->query(
-    "SELECT id, name
-     FROM users
-     ORDER BY name ASC"
-);
-
-$users = $userStmt->fetchAll();
+$users = $user->getAll();
 
 
 /*
@@ -85,21 +79,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
 
-            $sql = "INSERT INTO posts
-                    (title, category_id, user_id, content, date, reading_time)
-                    VALUES
-                    (:title, :category_id, :user_id, :content, :date, :reading_time)";
-
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-                ':title' => $title,
-                ':category_id' => $categoryId,
-                ':user_id' => $userId,
-                ':content' => $content,
-                ':date' => $date,
-                ':reading_time' => $readingTime
-            ]);
+            $post->create(
+                $title,
+                $categoryId,
+                $userId,
+                $content,
+                $date,
+                $readingTime
+            );
 
             header('Location: index.php');
             exit;
@@ -250,12 +237,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         Select a category
                                     </option>
 
-                                    <?php foreach ($categories as $category): ?>
+                                    <?php foreach ($categories as $categoryItem): ?>
 
                                         <option
-                                            value="<?= $category['id'] ?>"
+                                            value="<?= $categoryItem['id'] ?>"
                                         >
-                                            <?= htmlspecialchars($category['category_name']) ?>
+                                            <?= htmlspecialchars($categoryItem['category_name']) ?>
                                         </option>
 
                                     <?php endforeach; ?>
@@ -287,12 +274,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         Select an author
                                     </option>
 
-                                    <?php foreach ($users as $user): ?>
+                                    <?php foreach ($users as $userItem): ?>
 
                                         <option
-                                            value="<?= $user['id'] ?>"
+                                            value="<?= $userItem['id'] ?>"
                                         >
-                                            <?= htmlspecialchars($user['name']) ?>
+                                            <?= htmlspecialchars($userItem['name']) ?>
                                         </option>
 
                                     <?php endforeach; ?>
