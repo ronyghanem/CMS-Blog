@@ -3,49 +3,132 @@
 session_start();
 
 require_once 'classes/init.php';
+require_once 'includes/otp.php';
 
 $pdo = Database::getInstance();
 
-$userManager = new User($pdo);
+$user = new User($pdo);
 
-$message = '';
+$error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
 
-    if (empty($email) || empty($password)) {
 
-        $message = 'Please enter your email and password.';
+    // Validate fields
+    if (
+        empty($email) ||
+        empty($password)
+    ) {
 
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-
-        $message = 'Please enter a valid email address.';
+        $error = 'Email and password are required.';
 
     } else {
 
-        try {
+        // Check email and password
+        $loggedUser = $user->login(
+            $email,
+            $password
+        );
 
-            $user = $userManager->login($email, $password);
 
-            if ($user) {
+        if (!$loggedUser) {
 
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['user_name'] = $user['name'];
-                $_SESSION['user_email'] = $user['email'];
+            $error = 'Invalid email or password.';
 
-                header('Location: dashboard.php');
-                exit;
 
-            } else {
+        } elseif (
+            (int) $loggedUser['email_verified'] !== 1 ||
+            $loggedUser['status'] !== 'active'
+        ) {
 
-                $message = 'Invalid email or password.';
+            // Account exists but has not completed OTP verification
+            $_SESSION['otp_user_id'] = (int) $loggedUser['id'];
+
+
+            // Get current OTP information
+            $otpUser = $user->getOtpUser(
+                $loggedUser['id']
+            );
+
+
+            // Only generate a new OTP if the cooldown has passed
+            if (
+                !$otpUser ||
+                can_resend_otp(
+                    $otpUser['otp_last_sent_at'],
+                    60
+                )
+            ) {
+
+                // Generate new signup OTP
+                $otp = generate_numeric_otp();
+
+
+                // Hash OTP
+                $otpHash = hash_otp($otp);
+
+
+                // Expire in 10 minutes
+                $expiry = otp_expiry(10);
+
+
+                // Store OTP
+                $user->storeOtp(
+                    $loggedUser['id'],
+                    $otpHash,
+                    $expiry,
+                    'signup'
+                );
+
+
+                // LOCALHOST TESTING ONLY
+                $_SESSION['test_otp'] = $otp;
             }
 
-        } catch (PDOException $e) {
 
-            $message = 'Something went wrong. Please try again.';
+            header('Location: verify_otp.php');
+            exit;
+
+
+        } else {
+
+            // Active account
+            // Generate login OTP
+
+            $otp = generate_numeric_otp();
+
+
+            // Hash OTP
+            $otpHash = hash_otp($otp);
+
+
+            // OTP expires in 10 minutes
+            $expiry = otp_expiry(10);
+
+
+            // Store login OTP
+            $user->storeOtp(
+                $loggedUser['id'],
+                $otpHash,
+                $expiry,
+                'login'
+            );
+
+
+            // Store user ID temporarily
+            $_SESSION['pre_auth_user_id'] =
+                (int) $loggedUser['id'];
+
+
+            // LOCALHOST TESTING ONLY
+            $_SESSION['test_login_otp'] = $otp;
+
+
+            header('Location: login_otp.php');
+            exit;
         }
     }
 }
@@ -119,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <!-- Error Message -->
-                        <?php if ($message): ?>
+                        <?php if ($error): ?>
 
                             <div
                                 class="alert alert-danger d-flex align-items-center"
@@ -129,7 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <i class="bi bi-exclamation-circle me-2"></i>
 
                                 <div>
-                                    <?= htmlspecialchars($message) ?>
+                                    <?= htmlspecialchars($error) ?>
                                 </div>
 
                             </div>

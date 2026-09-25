@@ -91,41 +91,151 @@ class User
     }
 
     public function count()
-{
-    $stmt = $this->pdo->query(
-        "SELECT COUNT(*) FROM users"
-    );
+    {
+        $stmt = $this->pdo->query(
+            "SELECT COUNT(*) FROM users"
+        );
 
-    return $stmt->fetchColumn();
-}
+        return $stmt->fetchColumn();
+    }
 
-public function updatePassword($id, $password)
-{
-    $hashedPassword = password_hash(
-        $password,
-        PASSWORD_DEFAULT
-    );
+    public function updatePassword($id, $password)
+    {
+        $hashedPassword = password_hash(
+            $password,
+            PASSWORD_DEFAULT
+        );
 
-    $stmt = $this->pdo->prepare(
-        "UPDATE users
-         SET password = :password
-         WHERE id = :id"
-    );
+        $stmt = $this->pdo->prepare(
+            "UPDATE users
+             SET password = :password
+             WHERE id = :id"
+        );
 
-    return $stmt->execute([
-        'password' => $hashedPassword,
-        'id' => $id
-    ]);
-}
+        return $stmt->execute([
+            'password' => $hashedPassword,
+            'id' => $id
+        ]);
+    }
 
-public function getAll()
-{
-    $stmt = $this->pdo->query(
-        "SELECT id, name
-         FROM users
-         ORDER BY name ASC"
-    );
+    public function getAll()
+    {
+        $stmt = $this->pdo->query(
+            "SELECT id, name
+             FROM users
+             ORDER BY name ASC"
+        );
 
-    return $stmt->fetchAll();
-}
+        return $stmt->fetchAll();
+    }
+
+    public function storeOtp(
+        $userId,
+        $otpHash,
+        $expiry,
+        $purpose
+    ) {
+        $stmt = $this->pdo->prepare(
+            "UPDATE users
+             SET otp_hash = :otp_hash,
+                 otp_expiry = :otp_expiry,
+                 otp_purpose = :otp_purpose,
+                 otp_attempts = 0,
+                 otp_last_sent_at = :last_sent_at
+             WHERE id = :id"
+        );
+
+        return $stmt->execute([
+            'otp_hash' => $otpHash,
+            'otp_expiry' => $expiry,
+            'otp_purpose' => $purpose,
+            'last_sent_at' => date('Y-m-d H:i:s'),
+            'id' => $userId
+        ]);
+    }
+
+    public function getOtpUser($userId)
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, name, email,
+                    otp_hash,
+                    otp_expiry,
+                    otp_purpose,
+                    otp_attempts,
+                    otp_last_sent_at
+             FROM users
+             WHERE id = :id"
+        );
+
+        $stmt->execute([
+            'id' => $userId
+        ]);
+
+        return $stmt->fetch();
+    }
+
+    public function getOtpUserByEmail($email)
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, name, email,
+                    otp_hash,
+                    otp_expiry,
+                    otp_purpose,
+                    otp_attempts,
+                    otp_last_sent_at
+             FROM users
+             WHERE email = :email"
+        );
+
+        $stmt->execute([
+            'email' => $email
+        ]);
+
+        return $stmt->fetch();
+    }
+
+    public function verifyOtp($userId, $otp)
+    {
+        $user = $this->getOtpUser($userId);
+
+        if (!$user) {
+            return false;
+        }
+
+        if (!$user['otp_hash']) {
+            return false;
+        }
+
+        if (!$user['otp_expiry']) {
+            return false;
+        }
+
+        if (time() > strtotime($user['otp_expiry'])) {
+            return false;
+        }
+
+        if ($user['otp_attempts'] >= 5) {
+            return false;
+        }
+
+        if (!password_verify($otp, $user['otp_hash'])) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function markEmailVerified($userId)
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE users
+             SET email_verified = 1,
+                 status = 'active'
+             WHERE id = :id"
+        );
+
+        return $stmt->execute([
+            'id' => $userId
+        ]);
+    }
 }

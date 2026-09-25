@@ -3,54 +3,101 @@
 session_start();
 
 require_once 'classes/init.php';
+require_once 'includes/otp.php';
 
 $pdo = Database::getInstance();
 
-$userManager = new User($pdo);
+$user = new User($pdo);
 
-$message = '';
+$error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
 
-    if (empty($name) || empty($email) || empty($password)) {
+    // Validate required fields
+    if (
+        empty($name) ||
+        empty($email) ||
+        empty($password) ||
+        empty($confirmPassword)
+    ) {
 
-        $message = 'Please fill in all fields.';
+        $error = 'All fields are required.';
 
+    // Validate email
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
-        $message = 'Please enter a valid email address.';
+        $error = 'Please enter a valid email address.';
 
+    // Validate password length
     } elseif (strlen($password) < 6) {
 
-        $message = 'Password must be at least 6 characters.';
+        $error = 'Password must contain at least 6 characters.';
+
+    // Validate password confirmation
+    } elseif ($password !== $confirmPassword) {
+
+        $error = 'Passwords do not match.';
+
+    // Check if email already exists
+    } elseif ($user->emailExists($email)) {
+
+        $error = 'An account with this email already exists.';
 
     } else {
 
-        try {
+        // Create the user
+        $user->create(
+            $name,
+            $email,
+            $password
+        );
 
-            if ($userManager->emailExists($email)) {
+        // Get the newly created user
+        $newUser = $user->findByEmail($email);
 
-                $message = 'This email is already registered.';
+        $userId = (int) $newUser['id'];
 
-            } else {
+        // Generate OTP
+        $otp = generate_numeric_otp();
 
-                $userManager->create(
-                    $name,
-                    $email,
-                    $password
-                );
+        // Hash OTP
+        $otpHash = hash_otp($otp);
 
-                $message = 'Registration successful!';
-            }
+        // OTP expires in 10 minutes
+        $expiry = otp_expiry(10);
 
-        } catch (PDOException $e) {
+        // Store OTP
+        $user->storeOtp(
+            $userId,
+            $otpHash,
+            $expiry,
+            'signup'
+        );
 
-            $message = 'Something went wrong. Please try again.';
-        }
+        // Mark user as pending
+        $pdo->prepare(
+            "UPDATE users
+             SET status = 'pending',
+                 email_verified = 0
+             WHERE id = :id"
+        )->execute([
+            'id' => $userId
+        ]);
+
+        // Store user ID for OTP verification
+        $_SESSION['otp_user_id'] = $userId;
+
+        // LOCALHOST TESTING ONLY
+        $_SESSION['test_otp'] = $otp;
+
+        // Redirect to OTP verification
+        header('Location: verify_otp.php');
+        exit;
     }
 }
 
@@ -122,25 +169,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         </div>
 
-                        <!-- Message -->
-                        <?php if ($message): ?>
+
+                        <!-- Error Message -->
+                        <?php if ($error): ?>
 
                             <div
-                                class="alert <?= $message === 'Registration successful!' ? 'alert-success' : 'alert-danger' ?> d-flex align-items-center"
+                                class="alert alert-danger d-flex align-items-center"
                                 role="alert"
                             >
 
-                                <i
-                                    class="bi <?= $message === 'Registration successful!' ? 'bi-check-circle' : 'bi-exclamation-circle' ?> me-2"
-                                ></i>
+                                <i class="bi bi-exclamation-circle me-2"></i>
 
                                 <div>
-                                    <?= htmlspecialchars($message) ?>
+                                    <?= htmlspecialchars($error) ?>
                                 </div>
 
                             </div>
 
                         <?php endif; ?>
+
 
                         <!-- Registration Form -->
                         <form method="POST" action="">
@@ -167,12 +214,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         name="name"
                                         class="form-control"
                                         placeholder="Enter your name"
+                                        value="<?= htmlspecialchars($_POST['name'] ?? '') ?>"
                                         required
                                     >
 
                                 </div>
 
                             </div>
+
 
                             <!-- Email -->
                             <div class="mb-3">
@@ -196,6 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         name="email"
                                         class="form-control"
                                         placeholder="you@example.com"
+                                        value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
                                         required
                                     >
 
@@ -203,8 +253,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                             </div>
 
+
                             <!-- Password -->
-                            <div class="mb-4">
+                            <div class="mb-3">
 
                                 <label
                                     for="password"
@@ -225,6 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         name="password"
                                         class="form-control"
                                         placeholder="Minimum 6 characters"
+                                        minlength="6"
                                         required
                                     >
 
@@ -235,6 +287,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
 
                             </div>
+
+
+                            <!-- Confirm Password -->
+                            <div class="mb-4">
+
+                                <label
+                                    for="confirm_password"
+                                    class="form-label fw-semibold"
+                                >
+                                    Confirm Password
+                                </label>
+
+                                <div class="input-group">
+
+                                    <span class="input-group-text">
+                                        <i class="bi bi-lock-fill"></i>
+                                    </span>
+
+                                    <input
+                                        type="password"
+                                        id="confirm_password"
+                                        name="confirm_password"
+                                        class="form-control"
+                                        placeholder="Re-enter your password"
+                                        minlength="6"
+                                        required
+                                    >
+
+                                </div>
+
+                            </div>
+
 
                             <!-- Register Button -->
                             <div class="d-grid">
@@ -253,6 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
 
                         </form>
+
 
                         <!-- Login Link -->
                         <div class="text-center mt-4">
@@ -276,9 +361,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 </div>
 
+
                 <!-- Footer -->
                 <p class="text-center text-muted small mt-3">
+
                     &copy; <?= date('Y') ?> CMS Blog
+
                 </p>
 
             </div>
@@ -286,6 +374,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
     </div>
+
 
     <!-- Bootstrap JS -->
     <script
